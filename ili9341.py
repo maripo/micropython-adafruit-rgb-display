@@ -1,6 +1,19 @@
-import ustruct
+import struct as ustruct
 from rgb import DisplaySPI, color565
 
+REG_MADCTL = 0x36
+
+MADCTL_MY = 0x80  # Row Address Order
+MADCTL_MX = 0x40  # Column Address Order
+MADCTL_MV = 0x20  # Row / Column Exchange
+MADCTL_ML = 0x10  # Vertical Refresh Order
+MADCTL_BGR = 0x08 # RGB-BGR Order (0=RGB, 1=BGR)
+MADCTL_MH = 0x04  # Horizontal Refresh Order
+
+SCREEN_ROT_0DEG = 0
+SCREEN_ROT_90DEG = 1
+SCREEN_ROT_180DEG = 2
+SCREEN_ROT_270DEG = 3
 
 class ILI9341(DisplaySPI):
     """
@@ -50,6 +63,8 @@ class ILI9341(DisplaySPI):
 
     def __init__(self, spi, dc, cs, rst=None, width=240, height=320):
         super().__init__(spi, dc, cs, rst, width, height)
+        self.width_orig = width
+        self.height_orig = height
         self._scroll = 0
 
     def scroll(self, dy=None):
@@ -57,3 +72,25 @@ class ILI9341(DisplaySPI):
             return self._scroll
         self._scroll = (self._scroll + dy) % self.height
         self._write(0x37, ustruct.pack('>H', self._scroll))
+
+    def set_screen_rotation(self, rotation):
+        val = MADCTL_BGR
+        if rotation == SCREEN_ROT_0DEG:
+            pass
+        elif rotation == SCREEN_ROT_90DEG:
+            val |= MADCTL_MV
+        elif rotation == SCREEN_ROT_180DEG:
+            val |= MADCTL_MY
+        elif rotation == SCREEN_ROT_270DEG:
+            val |= (MADCTL_MX | MADCTL_MY | MADCTL_MV)
+        else:
+            raise Exception("Invalid screen rotation")
+        
+        if rotation % 2 == 0:
+            self.width = self.width_orig
+            self.height = self.height_orig
+        else:
+            self.width = self.height_orig
+            self.height = self.width_orig
+        
+        self._write(REG_MADCTL, bytearray([val]))
